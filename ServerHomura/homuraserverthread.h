@@ -14,8 +14,8 @@ public:
     HomuraServerThread(bool &IsServerStarted);
     void run();
     void PrintOnlineClients();
-    void BuildCommandsData(qint8 TotalCommandNum, quint8 WhichCommandId, COMMAND Command, QByteArray &DataToSend);
-    void SendCommandsToClients(COMMAND Command);
+    void BuildCommandData(/*In*/COMMAND Command, /*Out*/QByteArray &DataToSend);
+    void SendCommandToClients(COMMAND Command);
 public slots:
     void ThreadFinished();
 private:

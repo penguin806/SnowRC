@@ -29,10 +29,8 @@ void Homura::CommandUserInterfaceProc()
         qInfo("==================================");
         qInfo() << "1. Start Server";
         qInfo() << "2. Display Online Clients";
-        qInfo() << "3. Create&Excute Task";
-        qInfo() << "4. View&Cancel Client Tasks";
-        qInfo() << "5. Transfer File To Client";
-        qInfo() << "6. Update Client Program";
+        qInfo() << "3. Send Command To Clients";
+        qInfo() << "4. Update Client Program";  //Unimplemented
         qInfo() << "0. Exit" << endl;
 
         QTextStream in(stdin, QIODevice::ReadOnly);
@@ -55,7 +53,7 @@ void Homura::CommandUserInterfaceProc()
         case 3:
             if(true == this->bIsServerStarted)
             {
-                this->TaskProc();
+                this->SendCommandProc();
             }
             else
             {
@@ -63,10 +61,7 @@ void Homura::CommandUserInterfaceProc()
             }
             break;
         case 4:
-            break;
-        case 5:
-            break;
-        case 6:
+            qInfo("Update Client Program (Unimplemented)");
             break;
         case 0:
             if(true == this->bIsServerStarted)
@@ -92,7 +87,7 @@ void Homura::CommandUserInterfaceProc()
     }
 }
 
-void Homura::TaskProc()
+void Homura::SendCommandProc()
 {
     if(false == this->bIsServerStarted)
     {
@@ -113,7 +108,7 @@ void Homura::TaskProc()
         if(Buffer.toLower() == "all")
         {
             HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Input all, all clients will recv commands.");
-            this->Commands.bAllClients = true;
+            this->Command.bAllClients = true;
             break;
         }
         else
@@ -126,19 +121,19 @@ void Homura::TaskProc()
             }
             else
             {
-                this->Commands.ClientsIdList.append(id);
+                this->Command.ClientsIdList.append(id);
                 HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Input host id: "+
                                      QString::number(id));
             }
         }
     }
-    if(false == this->Commands.bAllClients && this->Commands.ClientsIdList.isEmpty())
+    if(false == this->Command.bAllClients && this->Command.ClientsIdList.isEmpty())
     {
         HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "No client recv command, return.");
         return;
     }
 
-    qInfo() << "Input command type: [MSG, EXEC, UPDATE]";
+    qInfo() << "Input command type: [MSG, EXEC, EXECT, UPDATE]";
     in >> Buffer;
     in.flush();
     HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command Type: "+Buffer);
@@ -146,19 +141,30 @@ void Homura::TaskProc()
     Buffer = Buffer.toUpper();
     if(Buffer == "MSG")
     {
-        this->Commands.Type = COMMAND_MSG;
+        this->Command.Type = COMMAND_MSG;
     }
     else if(Buffer == "EXEC")
     {
-        this->Commands.Type = COMMAND_EXEC;
+        this->Command.Type = COMMAND_EXEC;
     }
     else if(Buffer == "EXECT")
     {
-        this->Commands.Type = COMMAND_EXEC_WITHTIMER;
+        this->Command.Type = COMMAND_EXEC_WITHTIMER;
+        qInfo() << "Input Timer Value: (Command will execute after x minutes)";
+
+        in >> Buffer;
+        in.flush();
+        this->Command.ExecAfterMinutes = Buffer.toUShort();
+        if(this->Command.ExecAfterMinutes == 0)
+        {
+            HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command Timer Value Invalid, return");
+            return;
+        }
+        HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command Timer Value:"  + this->Command.ExecAfterMinutes);
     }
     else if(Buffer == "UPDATE")
     {
-        this->Commands.Type = COMMAND_SELFUPDATE;
+        this->Command.Type = COMMAND_SELFUPDATE;
     }
     else
     {
@@ -166,57 +172,40 @@ void Homura::TaskProc()
         return;
     }
 
-    quint8 Count = 0;
-    while(1)
-    {
-        qInfo() << "Input ###<cr> to end command creation";
-        qInfo() << "Input " << Count+1 << " command:";
-        in >> Buffer;
-        in.flush();
-
-        if(Buffer != "###")
-        {
-            this->Commands.CommandList.append(Buffer);
-            HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command " +
-                                 QString::number(Count)+": " + Buffer);
-            Count++;
-        }
-        else
-        {
-            HomuraLogSystem::Log(QtMsgType::QtInfoMsg,
-                                 "Input ###, command creation over.");
-            break;
-        }
-    }
-    if(Commands.CommandList.isEmpty())
-    {
-        HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "No command in list, return");
-        return;
-    }
-
-    qInfo() << "Command creation complete!";
-    qInfo() << "Input Y/y to send command...";
+    qInfo() << "Input command:";
     in >> Buffer;
     in.flush();
-    if(Buffer == "Y" || Buffer == "y")
+    HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command info:"  + Buffer);
+
+    if(Buffer.isEmpty())
+    {
+        HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command empty, return");
+        return;
+    }
+    this->Command.CommandString = Buffer;
+
+    qInfo() << "Input n/N to cancel, or anything else to send!";
+    in >> Buffer;
+    in.flush();
+    if(Buffer == "n" || Buffer == "N")
     {
         HomuraLogSystem::Log(QtMsgType::QtInfoMsg,
-                             "Input Y/y, now will send command to client!");
-        this->WorkingThread->SendCommandsToClients(this->Commands);
+                             "Input n/N, cancel command send process, return");
     }
     else
     {
         HomuraLogSystem::Log(QtMsgType::QtInfoMsg,
-                             "Input invalid, command will not send!");
+                             "Now will send command to client!");
+        this->WorkingThread->SendCommandToClients(this->Command);
     }
 }
 
 void Homura::ClearCommand()
 {
-    this->Commands.bAllClients = false;
-    this->Commands.ClientsIdList.clear();
-    this->Commands.ExecAfterMinutes = 0;
-    this->Commands.Type = COMMAND_MSG;
-    this->Commands.CommandList.clear();
+    this->Command.bAllClients = false;
+    this->Command.ClientsIdList.clear();
+    this->Command.ExecAfterMinutes = 0;
+    this->Command.Type = COMMAND_MSG;
+    this->Command.CommandString.clear();
     HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Cleared command structure.");
 }

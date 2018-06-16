@@ -1,7 +1,6 @@
 #include "homuraserverthread.h"
 #include "homuralogsystem.h"
 #include <QDataStream>
-#include <QTimer>
 
 HomuraServerThread::HomuraServerThread(bool &IsServerStarted) : IsServerStarted(IsServerStarted)
 {
@@ -27,53 +26,30 @@ void HomuraServerThread::PrintOnlineClients()
     this->server->PrintOnlineClients();
 }
 
-// MessageFormat [v0.0.1]:
-// Data << Packet size(int) << Command Id(quint8 start from 0) << Command Type
-// if(Command Type is MSG/EXEC) Data << Command String
-// else if(Command Type is MSGT) Data << AfterMinutes(quint16) << Command String
-// Data << EndSign
-void HomuraServerThread::BuildCommandsData(qint8 TotalCommandNum, quint8 WhichCommandId, COMMAND Command, QByteArray &DataToSend)
+// MessageFormat [v0.1.0]:
+// Data << Packet size(int) <<  Command Type(int) << AfterMinutes(quint16)
+// << Command String << EndTag(qint64)
+void HomuraServerThread::BuildCommandData(/*In*/COMMAND Command, /*Out*/QByteArray &DataToSend)
 {
-    QByteArray SendDataBuffer;
-    QDataStream dsIntoBuffer(&SendDataBuffer,QIODevice::WriteOnly);
-    dsIntoBuffer.setVersion(QDataStream::Qt_5_10);
-
-    dsIntoBuffer << WhichCommandId << (int)Command.Type;
-    if(COMMAND_MSG == Command.Type || COMMAND_EXEC == Command.Type)
-    {
-        dsIntoBuffer << Command.CommandList.at(WhichCommandId);
-    }
-    else
-    {
-        dsIntoBuffer << Command.ExecAfterMinutes
-                     << Command.CommandList.at(WhichCommandId);
-    }
-
-    if(WhichCommandId == TotalCommandNum)
-    {
-        dsIntoBuffer << LAST_COMMAND_END_TAG;
-    }
-    else
-    {
-        dsIntoBuffer << COMMAND_END_TAG;
-    }
     DataToSend.clear();
 
-    QDataStream dsIn(&DataToSend, QIODevice::WriteOnly);
-    dsIn.setVersion(QDataStream::Qt_5_10);
-    int PacketSize = SendDataBuffer.size() + sizeof(int)*2;
-    dsIn << PacketSize << SendDataBuffer;
+    QByteArray SendDataBuffer;
+    QDataStream dsIn_A(&SendDataBuffer,QIODevice::WriteOnly);
+    dsIn_A.setVersion(QDataStream::Qt_5_10);
+    dsIn_A << (int)Command.Type << Command.ExecAfterMinutes
+                 << Command.CommandString << (qint64)COMMAND_END_TAG;
+
+    QDataStream dsIn_B(&DataToSend, QIODevice::WriteOnly);
+    dsIn_B.setVersion(QDataStream::Qt_5_10);
+    int PacketSize = SendDataBuffer.size() + sizeof(int)*2; //Actually this needs + 4 bytes
+    dsIn_B << PacketSize << SendDataBuffer;
 }
 
-void HomuraServerThread::SendCommandsToClients(COMMAND Command)
+void HomuraServerThread::SendCommandToClients(COMMAND Command)
 {
     QByteArray DataToSend;
-    qint8 TotalCommandNum = Command.CommandList.size() - 1; // start from 0
 
-    for(int i= 0; i < TotalCommandNum; i++)
-    {
-        this->BuildCommandsData(TotalCommandNum, i, Command, DataToSend);
-    }
+    this->BuildCommandData(Command, DataToSend);
 
     if(true == Command.bAllClients)
     {

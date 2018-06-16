@@ -13,12 +13,12 @@ public:
     explicit Homura(QObject *parent = nullptr);
     void StartThisServer();
     void CommandUserInterfaceProc();
-    void TaskProc();
+    void SendCommandProc();
     void ClearCommand();
 
 private:
     HomuraServerThread *WorkingThread;
-    COMMAND Commands;
+    COMMAND Command;            //20180616 v0.1 Cancel Task System -> Single Comand
     bool bIsServerStarted;
 };
 

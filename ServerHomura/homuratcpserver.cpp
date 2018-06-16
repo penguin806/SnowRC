@@ -138,8 +138,6 @@ void HomuraTcpServer::OneClientErrorOccured(qintptr socketDescriptor, QString Er
 
 void HomuraTcpServer::ReceivedDataFromOneClient(qintptr socketDescriptor, qint64 BytesAvailable, QByteArray ReceivedData)
 {
-    //20180513 Unimplemented Parse Received Data From Client...
-
     for(int i = 0; i < this->clientSocketList.size(); i++)
     {
         HomuraTcpSocket *item = clientSocketList.at(i);
@@ -149,7 +147,7 @@ void HomuraTcpServer::ReceivedDataFromOneClient(qintptr socketDescriptor, qint64
                                  "Receieved " + QString::number(BytesAvailable)
                                  + " from [" + item->peerAddress().toString() + ":" +
                                  QString::number(item->peerPort()) + "]: ");
-
+            //20180513 Unimplemented Parse Received Data From Client...
             break;
         }
     }
