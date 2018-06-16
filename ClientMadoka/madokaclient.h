@@ -15,7 +15,7 @@ public:
     void ParseDataReceivedFromServer(QByteArray ReceivedData, qint64 BytesAvailable);
     void SendDataToServer(QByteArray DataToSend);
 
-    void ClearTempTask();
+    void ExecuteCommand(SVRCOMMAND Command);
 
 signals:
 
@@ -31,9 +31,6 @@ private:
     const QString ServerAddress = "127.0.0.1";
     const qint16 ServerPort = qint16(40500);
     QTcpSocket *socket;
-
-    QList<SVRCOMMAND> TaskList;
-    SVRCOMMAND TempTask;
 };
 
 #endif // MADOKACLIENT_H

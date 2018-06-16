@@ -22,6 +22,6 @@ struct CommandInfo          //v0.1.0
 };
 typedef CommandInfo COMMAND;
 
-#define COMMAND_END_TAG 0x102420484096;
+#define COMMAND_END_TAG 0x102420484096
 
 #endif // HOMURACUSTOMTYPE_H

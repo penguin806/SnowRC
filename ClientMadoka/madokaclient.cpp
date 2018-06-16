@@ -21,104 +21,69 @@ void MadokaClient::StartConnectToServer()
     this->socket->connectToHost(this->ServerAddress,this->ServerPort);
 }
 
-
-// MessageFormat [v0.0.1]:
-// Data << Packet size(int) << Command Id(quint8 start from 0) << Command Type
-// if(Command Type is MSG/EXEC) Data << Command String
-// else if(Command Type is MSGT) Data << AfterMinutes(quint16) << Command String
-// Data << EndSign(LAST_COMMAND_END_TAG / COMMAND_END_TAG)
+// MessageFormat [v0.1.0]:
+// Data << Packet size(int) <<  Command Type(int) << AfterMinutes(quint16)
+// << Command String << EndTag(qint64)
 void MadokaClient::ParseDataReceivedFromServer(QByteArray ReceivedDataBuffer, qint64 BytesAvailable)
 {
-    QDataStream RecvDataTempOutStream(&ReceivedDataBuffer, QIODevice::ReadOnly);
-    RecvDataTempOutStream.setVersion(QDataStream::Qt_5_10);
+    QDataStream dsOut_A(&ReceivedDataBuffer, QIODevice::ReadOnly);
+    dsOut_A.setVersion(QDataStream::Qt_5_10);
 
     int PackageSize = 0;
-    RecvDataTempOutStream >> PackageSize;
+    dsOut_A >> PackageSize;
     MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field1-PackageSize: " + QString::number(PackageSize));
     if(PackageSize != BytesAvailable)
     {
         MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field1-PackageSize not equal to BytesAvailable, return.");
-        this->ClearTempTask();
         return;
     }
 
     QByteArray ReceivedData;
-    RecvDataTempOutStream >> ReceivedData;
-    QDataStream RecvDataOutStream(&ReceivedData, QIODevice::ReadOnly);
-    RecvDataOutStream.setVersion(QDataStream::Qt_5_10);
-
-    qint8 CommandId = 0;
-    RecvDataOutStream >> CommandId;
-    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field2-CommandId: " + QString::number(CommandId));
-    if(CommandId != this->TempTask.CommandList.size())
-    {
-        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field2-CommandId not equal to CommandList.size(), return.");
-        this->ClearTempTask();
-        return;
-    }
+    dsOut_A >> ReceivedData;
+    QDataStream dsOut_B(&ReceivedData, QIODevice::ReadOnly);
+    dsOut_B.setVersion(QDataStream::Qt_5_10);
 
     int CommandType = 0;
-    RecvDataOutStream >> CommandType;
-    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field3-CommandType: " + QString::number(CommandType));
-    if(this->TempTask.CommandList.isEmpty())
-    {
-        this->TempTask.Type = (ServerCommandType)CommandType;
-    }
-    else if(this->TempTask.Type != CommandType)
-    {
-        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field3-CommandType not equal to prev recv CommandType, return.");
-        this->ClearTempTask();
-        return;
-    }
-
-    QString CommandString;
     quint16 AfterMinutes = 0;
+    QString CommandString;
+    qint64 CommandEndTag = 0;
+    dsOut_B >> CommandType >> AfterMinutes >> CommandString >> CommandEndTag;
 
-    switch (CommandType) {
-    case COMMAND_MSG:
-    case COMMAND_EXEC:
-        RecvDataOutStream >> CommandString;
-        MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field4-CommandString: " + CommandString);
-        if(CommandString.isEmpty())
-        {
-            MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field4-CommandString empty, return.");
-            this->ClearTempTask();
-            return;
-        }
-        this->TempTask.CommandList.append(CommandString);
-        break;
-    case COMMAND_EXEC_WITHTIMER:
-        RecvDataOutStream >> AfterMinutes >> CommandString;
-        MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field4-AfterMinutes: " + QString::number(AfterMinutes));
-        this->TempTask.ExecAfterMinutes = AfterMinutes;
-        MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field5-CommandString: " + CommandString);
-        if(CommandString.isEmpty())
-        {
-            MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field5-CommandString empty, return.");
-            this->ClearTempTask();
-            return;
-        }
-        this->TempTask.CommandList.append(CommandString);
-        break;
-    default:
-        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field3-CommandType invalid, return.");
-        this->ClearTempTask();
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field2-CommandType: " + QString::number(CommandType));
+    if(CommandType < COMMAND_MSG || CommandType > COMMAND_SELFUPDATE)
+    {
+        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field2-CommandType invalid, return.");
         return;
     }
 
-    int EndSign;
-    RecvDataOutStream >> EndSign;
-    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Packet end sign: " + QString::number(EndSign));
-    if(EndSign == LAST_COMMAND_END_TAG)
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field3-AfterMinutes: " + QString::number(AfterMinutes));
+    if(AfterMinutes > 525600 /*One year*/)
     {
-        this->TaskList.append(this->TempTask);
-        MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Last command of the task, append to task list.");
+        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field3-AfterMinutes larger than 525600, return.");
+        return;
     }
-    else if(EndSign != COMMAND_END_TAG)
+
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field4-CommandString: " + CommandString);
+    if(CommandString.isEmpty())
     {
-        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "EndSign invalid, return.");
-        this->ClearTempTask();
+        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field4-CommandString empty, return.");
+        return;
     }
+
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field5-EndTag: " + QString::number(CommandEndTag));
+    if(CommandEndTag != COMMAND_END_TAG)
+    {
+        MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field5-EndTag invalid, return.");
+        return;
+    }
+
+    //Each part of recv packet is ok, now execute command!
+    SVRCOMMAND CurrentCommand;
+    CurrentCommand.Type = (ServerCommandType)CommandType;
+    CurrentCommand.ExecAfterMinutes = AfterMinutes;
+    CurrentCommand.Command = CommandString;
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Packet correct, now execute command!");
+    this->ExecuteCommand(CurrentCommand);
 }
 
 void MadokaClient::SendDataToServer(QByteArray DataToSend)
@@ -126,11 +91,15 @@ void MadokaClient::SendDataToServer(QByteArray DataToSend)
 
 }
 
-void MadokaClient::ClearTempTask()
+void MadokaClient::ExecuteCommand(SVRCOMMAND Command)
 {
-    this->TempTask.CommandList.clear();
-    this->TempTask.ExecAfterMinutes = 0;
-    this->TempTask.Type = COMMAND_MSG;
+    switch (Command.Type) {
+    case COMMAND_MSG:
+
+        break;
+    default:
+        break;
+    }
 }
 
 void MadokaClient::ServerHostFound()
