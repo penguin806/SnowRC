@@ -18,11 +18,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
     madokaclient.cpp \
-    madokalogsystem.cpp
+    madokalogsystem.cpp \
+    madokacmdrunnable.cpp
 
 HEADERS += \
     madokaclient.h \
     madokacustomtype.h \
-    madokalogsystem.h
+    madokalogsystem.h \
+    madokacmdrunnable.h
 
 VERSION = 0.0.1.0

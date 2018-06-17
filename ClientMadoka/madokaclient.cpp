@@ -1,6 +1,7 @@
 #include "madokaclient.h"
 #include "madokalogsystem.h"
 #include "madokacustomtype.h"
+#include "madokacmdrunnable.h"
 #include <QDataStream>
 
 MadokaClient::MadokaClient(QObject *parent) : QObject(parent)
@@ -63,7 +64,7 @@ void MadokaClient::ParseDataReceivedFromServer(QByteArray ReceivedDataBuffer, qi
         return;
     }
 
-    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field4-CommandString: " + CommandString);
+    MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Field4-CommandString: <" + CommandString + ">");
     if(CommandString.isEmpty())
     {
         MadokaLogSystem::Log(QtMsgType::QtCriticalMsg, "Field4-CommandString empty, return.");
@@ -83,23 +84,32 @@ void MadokaClient::ParseDataReceivedFromServer(QByteArray ReceivedDataBuffer, qi
     CurrentCommand.ExecAfterMinutes = AfterMinutes;
     CurrentCommand.Command = CommandString;
     MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "Packet correct, now execute command!");
-    this->ExecuteCommand(CurrentCommand);
+    this->CommandProc(CurrentCommand);
+}
+
+
+void MadokaClient::CommandProc(SVRCOMMAND CommandStruct)
+{
+    switch (CommandStruct.Type) {
+    case COMMAND_MSG:
+        MadokaLogSystem::Log(QtMsgType::QtInfoMsg, "COMMAND_MSG: " + CommandStruct.Command);
+        break;
+    case COMMAND_EXEC:
+    case COMMAND_EXEC_WITHTIMER:
+    case COMMAND_SELFUPDATE:
+    {
+        MadokaCmdRunnable *cmdRunnable = new MadokaCmdRunnable(CommandStruct);
+        this->WorkingThreadPool.start(cmdRunnable);
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 void MadokaClient::SendDataToServer(QByteArray DataToSend)
 {
 
-}
-
-void MadokaClient::ExecuteCommand(SVRCOMMAND Command)
-{
-    switch (Command.Type) {
-    case COMMAND_MSG:
-
-        break;
-    default:
-        break;
-    }
 }
 
 void MadokaClient::ServerHostFound()
