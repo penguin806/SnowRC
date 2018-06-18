@@ -104,7 +104,6 @@ void Homura::SendCommandProc()
     while(1)
     {
         in >> Buffer;
-        in.flush();
         if(Buffer.toLower() == "all")
         {
             HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Input all, all clients will recv commands.");
@@ -113,7 +112,7 @@ void Homura::SendCommandProc()
         }
         else
         {
-            quint8 id = Buffer.toUShort();
+            quint16 id = Buffer.toUShort();
             if(id == 666)
             {
                 HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Input 666, list creation over.");
@@ -135,7 +134,6 @@ void Homura::SendCommandProc()
 
     qInfo() << "Input command type: [MSG, EXEC, EXECT, UPDATE]";
     in >> Buffer;
-    in.flush();
     HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command Type: "+Buffer);
 
     Buffer = Buffer.toUpper();
@@ -153,7 +151,6 @@ void Homura::SendCommandProc()
         qInfo() << "Input Timer Value: (Command will execute after x minutes)";
 
         in >> Buffer;
-        in.flush();
         this->Command.ExecAfterMinutes = Buffer.toUShort();
         if(this->Command.ExecAfterMinutes == 0)
         {
@@ -173,8 +170,8 @@ void Homura::SendCommandProc()
     }
 
     qInfo() << "Input command:";
-    in >> Buffer;
-    in.flush();
+    in.skipWhiteSpace();
+    Buffer = in.readLine();
     HomuraLogSystem::Log(QtMsgType::QtInfoMsg, "Command info:"  + Buffer);
 
     if(Buffer.isEmpty())
@@ -186,7 +183,6 @@ void Homura::SendCommandProc()
 
     qInfo() << "Input n/N to cancel, or anything else to send!";
     in >> Buffer;
-    in.flush();
     if(Buffer == "n" || Buffer == "N")
     {
         HomuraLogSystem::Log(QtMsgType::QtInfoMsg,
